@@ -1,0 +1,78 @@
+ModelProto{
+    ir_version = 1
+    producer_name = "TestProducer"
+    producer_version = "1.0"
+    domain = "test.onnx"
+model_version = 1
+doc_string = "This is testmodel9."
+    graph{
+        name = "DuplicateNodeNameGraph"
+        node{
+            op_type = "Add"
+            name = "DuplicateNode"
+            input = ["input1"]
+            output = ["output1"]
+        }
+        node{
+            op_type = "Mul"
+            name = "DuplicateNode"
+            input = ["input2"]
+            output = ["output2"]
+        }
+input{
+            name = "input1"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+        }
+        input{
+            name = "input2"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+        }
+        output{
+            name = "output1"
+            type{
+                tensor_type{
+                    elem_type = int
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+output{
+            name = "output2"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+    opset_import{
+        domain = "ai.onnx"
+        version = 11
+    }
+}

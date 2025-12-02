@@ -1,0 +1,92 @@
+ModelProto{
+ir_version=8
+producer_name= "onnx-example"
+producer_version = "1.0"
+domain = "example_domain"
+model_version = 1
+doc_string = "This is an example ONNX model."
+graph {
+   name= "test-model"
+   node {
+op_type= "Pad"
+name= "test-node"
+input=["X","pads","value"]
+      output=[ "Y" ]
+      attribute {
+        name= "mode"
+        value = "33"
+      }
+   }
+   input {
+      name= "X"
+      type {　
+        tensor_type {
+          elem_type= int
+          shape {
+            dim {
+              dim_value= 3
+            }
+            dim {
+             dim_value= 2
+           }
+         }
+       }
+     }
+   }
+   input {
+     name="pads"
+     type {
+       tensor_type {
+         elem_type= int
+         shape {
+            dim {
+              dim_value= 1
+            }
+           dim {
+             dim_value= 4
+           }
+         }
+       }
+      }
+   }
+   input {
+     name= "value"
+     type {
+        tensor_type {
+          elem_type= int
+          shape {
+            dim {
+              dim_value= 1
+            }
+          }
+        }
+     }
+   }
+   output {
+     name="Y"
+     type {
+        tensor_type {
+          elem_type= int
+          shape {
+            dim {
+              dim_value=3
+            }
+            dim {
+              dim_value=4
+            }
+          }
+        }
+     }
+    }
+initializer {
+name= "conv.bias"
+      data_type=int
+dims=1 2 3 4
+   	  raw_data=000000000000b
+   }
+}
+opset_import {
+domain = "ex"
+  	version=15
+}
+}

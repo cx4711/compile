@@ -1,0 +1,1250 @@
+CompileMain.class如下：
+
+package cxcx;
+
+import java.io.IOException;
+import java.util.List;
+
+public class CompileMain {
+    public static void main(String[] args) throws IOException {
+        // 1. 读取文件并进行词法分析
+        String filePath = "E:\\javawork\\compile\\src\\main\\java\\cx\\example1.txt";  // 输入文件路径
+        LexicalAnalyzer lexer = new LexicalAnalyzer();
+        String sourceCode = null;
+
+        // 读取文件内容
+        try {
+            sourceCode = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(filePath)));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        // 进行词法分析
+        List<LexicalAnalyzer.Token> tokens = lexer.analyze(sourceCode);
+        System.out.println("Lexical analysis results:");
+        for (LexicalAnalyzer.Token token : tokens) {
+            System.out.println(token.type + ": " + token.value);
+        }
+
+        // 2. 进行语法分析
+        SyntaxAnalyzer syntaxAnalyzer = new SyntaxAnalyzer(tokens);
+        ASTNode ast = syntaxAnalyzer.parse();
+        System.out.println("\nSyntax analysis results (AST):");
+        ast.print();
+
+        // 3. 进行语义分析
+        SemanticAnalyzer semanticAnalyzer = new SemanticAnalyzer();
+        System.out.println("\nStarting semantic analysis...");
+        try {
+            semanticAnalyzer.analyze(ast);
+            System.out.println("未发现错误，语义检查通过");
+        } catch (SemanticAnalyzer.SemanticErrorException e) {
+            System.out.println("发现语义错误:");
+            e.getErrors().forEach(err ->
+                    System.out.println(" - " + err.getMessage())
+            );
+            System.out.println("发现 " + e.getErrors().size() + " 个错误");
+        }
+
+        // 4. 进行代码生成
+        CodeGenerator codeGenerator = new CodeGenerator();
+        System.out.println("\nCode generation results:");
+        List<String> tacCode = codeGenerator.generate(ast);
+        for (String line : tacCode) {
+            System.out.println(line);
+        }
+    }
+}
+
+
+
+
+
+
+LexicalAnalyzer.class如下：
+
+package cxcx;
+
+import java.io.IOException;
+import java.util.regex.*;
+import java.util.*;
+
+public class LexicalAnalyzer {
+    // 定义正则表达式
+    private static final String KEYWORDS = "ModelProto|graph|name|node|input|output|op_type|attribute|initializer|doc_string|domain|model_version|producer_name|producer_version|ir_version|tensor_type|elem_type|shape|dim_value|dim_param|dims|dim|raw_data|opset_import|data_type|version|value|type|int|float|string|bool";
+    private static final String INTEGER = "[-+]?\\d+";
+    private static final String STRING = "\"[^\"]*\"";
+    private static final String BYTES = "[0-9A-Fa-f]+b";
+    private static final String IDENTIFIER = "[a-zA-Z_][a-zA-Z0-9_]*";
+    private static final String SYMBOLS = "[\\[\\]{}=,]";  // 包括方括号、花括号、逗号等
+
+    // Token类型
+    enum TokenType {
+
+        KEYWORD, BYTES, IDENTIFIER, INTEGER, STRING, SYMBOL, ERROR
+    }
+
+    // Token类
+    static class Token {
+        TokenType type;
+        String value;
+
+        public Token(TokenType type, String value) {
+            this.type = type;
+            this.value = value;
+        }
+    }
+
+    public List<Token> analyze(String sourceCode) {
+        List<Token> tokens = new ArrayList<>();
+        Pattern pattern = Pattern.compile(KEYWORDS + "|" + BYTES + "|" + INTEGER + "|" + STRING + "|" + IDENTIFIER + "|" + SYMBOLS);
+        Matcher matcher = pattern.matcher(sourceCode);
+
+        while (matcher.find()) {
+            String match = matcher.group();
+            TokenType type = getTokenType(match);
+            if (type == TokenType.ERROR) {
+                // 如果匹配不到任何合法的 token, 抛出异常
+                throw new IllegalArgumentException("Unexpected character: " + match);
+            }
+            tokens.add(new Token(type, match));
+        }
+
+        return tokens;
+    }
+
+    // 获取Token类型
+    private TokenType getTokenType(String match) {
+        if (match.matches(KEYWORDS)) {
+            return TokenType.KEYWORD;
+        } else if (match.matches(INTEGER)) {
+            return TokenType.INTEGER;
+        } else if (match.matches(STRING)) {
+            return TokenType.STRING;
+        } else if (match.matches(BYTES)) {
+            return TokenType.BYTES;
+        } else if (match.matches(IDENTIFIER)) {
+            return TokenType.IDENTIFIER;
+        } else if (match.matches(SYMBOLS)) {
+            return TokenType.SYMBOL;
+        }
+        return TokenType.ERROR;
+    }
+}
+
+
+
+
+
+
+
+SyntaxAnalyzer.class如下：
+
+package cxcx;
+
+import java.util.*;
+import cxcx.LexicalAnalyzer.*;
+
+public class SyntaxAnalyzer {
+    private List<Token> tokens;
+    private int index = 0;
+
+    public SyntaxAnalyzer(List<Token> tokens) {
+        this.tokens = tokens;
+    }
+
+    public ASTNode parse() {
+        return parseModel();
+    }
+
+    // 解析模型
+    private ASTNode parseModel() {
+        expect("ModelProto");
+        expect("{");
+        ASTNode modelBody = parseModelBody();
+        expect("}");
+        return modelBody;
+    }
+
+    private ASTNode parseModelBody() {
+        // 按照文法规则解析模型
+        ASTNode modelBody = new ASTNode("ModelBody");
+        modelBody.addChild(parseIrVersion());
+        modelBody.addChild(parseProducerName());
+        modelBody.addChild(parseProducerVersion());
+        modelBody.addChild(parseDomain());
+        modelBody.addChild(parseModelVersion());
+        modelBody.addChild(parseDocString());
+        modelBody.addChild(parseGraph());
+        modelBody.addChild(parseOpsetImport());
+        return modelBody;
+    }
+
+    private ASTNode parseIrVersion() {
+        expect("ir_version");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("ir_version", value);
+    }
+
+    private ASTNode parseProducerName() {
+        expect("producer_name");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("producer_name", value);
+    }
+    private ASTNode parseProducerVersion() {
+        expect("producer_version");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("producer_version", value);
+    }
+
+    private ASTNode parseDomain() {
+        expect("domain");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("domain", value);
+    }
+
+    private ASTNode parseModelVersion() {
+        expect("model_version");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("model_version", value);
+    }
+
+    private ASTNode parseDocString() {
+        expect("doc_string");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("doc_string", value);
+    }
+
+    private ASTNode parseGraph() {
+        expect("graph");
+        expect("{");
+        ASTNode graphNode = new ASTNode("graph");
+        graphNode.addChild(parseGraphBody());
+        expect("}");
+        return graphNode;
+    }
+
+    private ASTNode parseGraphBody() {
+        ASTNode graphBody = new ASTNode("graph_body");
+        graphBody.addChild(parseName());
+        // 循环解析可能重复出现的元素
+        while (index < tokens.size() && !currentToken().value.equals("}")) {
+            switch (currentToken().value) {
+                case "node":
+                    graphBody.addChild(parseNodeList());
+                    break;
+                case "input":
+                    graphBody.addChild(parseInputList());
+                    break;
+                case "output":
+                    graphBody.addChild(parseOutputList());
+                    break;
+                case "initializer":
+                    graphBody.addChild(parseInitializerList());
+                    break;
+                default:
+                    throw new SyntaxError("Unexpected token in graph body: " + currentToken().value);
+            }
+        }
+        return graphBody;
+    }
+
+    private ASTNode parseName() {
+        expect("name");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("name", value);
+    }
+
+    private ASTNode parseNodeList() {
+        expect("node");
+        expect("{");
+        ASTNode nodeList = new ASTNode("node_list");
+        nodeList.addChild(parseNodeDef());
+        while (currentToken().value.equals("node")) {
+            nodeList.addChild(parseNodeDef());
+        }
+        expect("}");
+        return nodeList;
+    }
+
+    private ASTNode parseNodeDef() {
+        ASTNode nodeDef = new ASTNode("node");
+        nodeDef.addChild(parseOpType());
+        nodeDef.addChild(parseName());
+        nodeDef.addChild(parseInputDef());
+        nodeDef.addChild(parseOutputDef());
+        // 解析attribute_list如果有
+        if (currentToken().value.equals("attribute")) {
+            nodeDef.addChild(parseAttributeList());
+        }
+        return nodeDef;
+    }
+    private ASTNode parseAttributeList() {
+        expect("attribute");
+        expect("{");
+        ASTNode attributeList = new ASTNode("attribute_list");
+        attributeList.addChild(parseAttributeDef());  // 解析一个属性定义
+
+        // 解析可能存在的重复属性定义
+        while (currentToken().value.equals("attribute")) {
+            attributeList.addChild(parseAttributeDef());
+        }
+
+        expect("}");
+        // 解析可能存在的重复属性列表（attribute_repeats）
+        if (currentToken().value.equals("attribute")) {
+            attributeList.addChild(parseAttributeList());
+        }
+
+        return attributeList;
+    }
+
+    private ASTNode parseAttributeDef() {
+        ASTNode attributeDef = new ASTNode("attribute");
+
+        // 解析name_def
+        expect("name");
+        expect("=");
+        String name = currentToken().value;
+        index++;
+        attributeDef.addChild(new ASTNode("name", name));
+
+        // 解析value_def
+        expect("value");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        attributeDef.addChild(new ASTNode("Value", value));
+
+        return attributeDef;
+    }
+
+    private ASTNode parseOpType() {
+        expect("op_type");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("op_type", value);
+    }
+
+    private ASTNode parseInputDef() {
+        expect("input");
+        if (currentToken().value.equals("{")) { // 块格式
+            return parseInputList();
+        } else if (currentToken().value.equals("=")) { // 数组格式
+            expect("=");
+            expect("[");
+            return parseInputArr();
+        }
+        throw new SyntaxError("Expected { or [");
+    }
+
+    private ASTNode parseInputArr() {
+        ASTNode arrNode = new ASTNode("input_arr");
+        arrNode.addChild(new ASTNode("Value", currentToken().value));
+        index++;
+
+        while (currentToken().value.equals(",")) {
+            index++; // 跳过逗号
+            arrNode.addChild(new ASTNode("Value", currentToken().value));
+            index++;
+        }
+        expect("]");
+        return arrNode;
+    }
+
+    private ASTNode parseInputList() {
+        expect("input");
+        expect("{");
+        ASTNode inputList = new ASTNode("input_list");
+        // 使用do-while确保至少解析一个valueInfo
+        do {
+            inputList.addChild(parseValueInfoDef());
+        } while (currentToken().value.equals("input")); // 检查是否有后续input条目
+        expect("}");
+        return inputList;
+    }
+
+    private ASTNode parseOutputDef() {
+        expect("output");
+        if (currentToken().value.equals("{")) { // 块格式
+            return parseOutputList();
+        } else if (currentToken().value.equals("=")) { // 数组格式
+            expect("=");
+            expect("[");
+            return parseOutputArr();
+        }
+        throw new SyntaxError("Expected { or [");
+    }
+
+    // 解析数组格式
+    private ASTNode parseOutputArr() {
+        ASTNode arrNode = new ASTNode("output_arr");
+        arrNode.addChild(new ASTNode("Value", currentToken().value));
+        index++;
+
+        while (currentToken().value.equals(",")) {
+            index++; // 跳过逗号
+            arrNode.addChild(new ASTNode("Value", currentToken().value));
+            index++;
+        }
+        expect("]");
+        return arrNode;
+    }
+    private ASTNode parseOutputList() {
+        expect("output");
+        if (currentToken().value.equals("{")) {
+            expect("{");
+            ASTNode outputList = new ASTNode("output_list");
+            do {
+                outputList.addChild(parseValueInfoDef());
+            } while (currentToken().value.equals("output"));
+            expect("}");
+            return outputList;
+        }
+        throw new SyntaxError("Expected { for output list");
+    }
+
+    private ASTNode parseInitializerList() {
+        if (index >= tokens.size() || !currentToken().value.equals("initializer")) {
+            return new ASTNode("initializer_list"); // 返回空节点
+        }
+
+
+        if (currentToken().value.equals("initializer")) {
+            expect("initializer");
+            expect("{");
+            ASTNode initializerList = new ASTNode("initializer_list");
+            initializerList.addChild(parseTensorDef());
+            while (currentToken().value.equals("initializer")) {
+                initializerList.addChild(parseTensorDef());
+            }
+            expect("}");
+            return initializerList;
+        }
+        return null; // 如果没有initializer，返回null
+    }
+
+    private ASTNode parseValueInfoDef() {
+        ASTNode valueInfoDef = new ASTNode("value_info");
+        // 确保当前是name字段
+        if (!currentToken().value.equals("name")) {
+            throw new SyntaxError("Expected name in ValueInfoDef but found " + currentToken().value);
+        }
+        valueInfoDef.addChild(parseName());
+// 确保接下来是type字段
+        if (!currentToken().value.equals("type")) {
+            throw new SyntaxError("Expected type in ValueInfoDef but found " + currentToken().value);
+        }
+        valueInfoDef.addChild(parseTypeDef());
+        return valueInfoDef;
+    }
+
+    private ASTNode parseTypeDef() {
+        expect("type");
+        expect("{");
+        ASTNode tensorTypeDef = parseTensorTypeDef();
+        expect("}");
+        return tensorTypeDef;
+    }
+
+    private ASTNode parseTensorTypeDef() {
+        expect("tensor_type");
+        expect("{");
+        ASTNode tensorTypeDef = new ASTNode("tensor_type");
+        /*// 解析 elem_type
+        tensorTypeDef.addChild(parseElemType());
+        // 跳过中间可能的 token 直到遇到 "shape"
+        while (!currentToken().value.equals("shape") && index < tokens.size()) {
+            index++; // 跳过当前 token
+        }
+        // 解析 shape
+        tensorTypeDef.addChild(parseShapeDef());
+        // 确保处理完 tensor_type 块
+        while (!currentToken().value.equals("}")) {
+            index++;
+        }*/
+        while (!currentToken().value.equals("}")) {
+            switch (currentToken().value) {
+                case "elem_type":
+                    tensorTypeDef.addChild(parseElemType());
+                    break;
+                case "shape":
+                    tensorTypeDef.addChild(parseShapeDef());
+                    break;
+                default:
+                    index++; // 跳过未知字段
+            }
+        }
+
+
+        expect("}");
+        return tensorTypeDef;
+    }
+
+    private ASTNode parseElemType() {
+        expect("elem_type");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        if (value.equals("int") || value.equals("float") || value.equals("string") || value.equals("bool")) {
+            return new ASTNode("elem_type", value);
+        }
+        throw new SyntaxError("Expected valid elem_type but found " + value);
+    }
+
+    private ASTNode parseShapeDef() {
+        expect("shape");
+        expect("{");
+        ASTNode shapeDef = new ASTNode("shape");
+        shapeDef.addChild(parseDimList());
+        expect("}");
+        return shapeDef;
+    }
+
+    private ASTNode parseDimList() {
+        ASTNode dimList = new ASTNode("dim_list");
+        while (currentToken().value.equals("dim")) {
+            dimList.addChild(parseDimDef());
+        }
+        return dimList;
+    }
+
+    private ASTNode parseDimDef() {
+        expect("dim");
+        expect("{");
+        ASTNode dimNode = new ASTNode("dim");
+        String tokenValue = currentToken().value;
+        if (!tokenValue.equals("dim_value") && !tokenValue.equals("dim_param")) {
+            throw new SyntaxError("Expected dim_value or dim_param but found " + tokenValue);
+        }
+        expect(tokenValue);
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        if (value.matches("-?\\d+(\\.\\d+)?")) {
+            dimNode.addChild(new ASTNode("dim_value",value)); // 如果是数字，dim_value
+        } else {
+            dimNode.addChild(new ASTNode("dim_param",value));
+            // return new ASTNode("dim_param", value);  // 如果是字符串，dim_param
+        }
+        expect("}");
+        return dimNode;
+    }
+
+    private ASTNode parseTensorDef() {
+        ASTNode tensorDef = new ASTNode("tensor");
+        tensorDef.addChild(parseName());
+        tensorDef.addChild(parseDataTypeDef());
+        tensorDef.addChild(parseDimsDef());
+        tensorDef.addChild(parseRawDataDef());
+        return tensorDef;
+    }
+
+    private ASTNode parseDataTypeDef() {
+        expect("data_type");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        if (value.equals("int") || value.equals("float") || value.equals("string") || value.equals("bool")) {
+            return new ASTNode("data_type", value);
+        }
+        throw new SyntaxError("Expected valid data_type but found " + value);
+    }
+
+    private ASTNode parseDimsDef() {
+        expect("dims");
+        expect("=");
+        ASTNode dimsDef = new ASTNode("dims");
+        // 直接消耗后续连续 INTEGER
+        while (currentToken().type == TokenType.INTEGER) {
+            dimsDef.addChild(new ASTNode("dim_value", currentToken().value));
+            index++;
+        }
+
+        return dimsDef;
+    }
+
+    private ASTNode parseRawDataDef() {
+        if (currentToken().value.equals("raw_data")) {
+            expect("raw_data");
+            expect("=");
+            String value = currentToken().value;
+            index++;
+            return new ASTNode("raw_data", value);
+        }
+        return null;
+    }
+
+    private ASTNode parseOpsetImport() {
+        if (currentToken().value.equals("opset_import")) {
+            expect("opset_import");
+            expect("{");
+            ASTNode opsetImport = new ASTNode("opset_import");
+            opsetImport.addChild(parseDomain());
+            opsetImport.addChild(parseVersionDef());
+            expect("}");
+            return opsetImport;
+        }
+        return null;
+    }
+
+    private ASTNode parseVersionDef() {
+        expect("version");
+        expect("=");
+        String value = currentToken().value;
+        index++;
+        return new ASTNode("version", value);
+    }
+
+
+    // 获取当前的Token
+    private Token currentToken() {
+        return tokens.get(index);
+    }
+
+    // 期待某个Token，并且移动到下一个Token
+    private void expect(String expectedValue) {
+        if (index < tokens.size()) {
+            Token token = tokens.get(index);
+            if (token.value.equals(expectedValue)) {
+                index++;
+            } else {
+                throw new RuntimeException("Expected " + expectedValue + " but found " + token.value);
+            }
+        } else {
+            throw new RuntimeException("Unexpected end of input. Expected " + expectedValue);
+        }
+    }
+
+}
+
+class SyntaxError extends RuntimeException {
+    public SyntaxError(String message) {
+        super(message);
+    }
+}
+
+// AST节点类
+class ASTNode {
+    String name;
+    String value;
+    List<ASTNode> children = new ArrayList<>();
+
+    ASTNode(String name) {
+        this.name = name;
+    }
+
+    ASTNode(String name, String value) {
+        this.name = name;
+        this.value = value;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public List<ASTNode> getChildren() {
+        return children;
+    }
+
+    void addChild(ASTNode child) {
+        children.add(child);
+    }
+
+    void print() {
+        print("", true);
+    }
+
+    private void print(String indent, boolean last) {
+        // 显示改进：处理嵌套结构
+        String displayName = name;
+        if (name.equals("GraphBody")) {
+            displayName = "";
+        }
+
+        System.out.println(indent + (last ? "+-- " : "|-- ") + displayName + (value != null ? ": " + value : ""));
+        for (int i = 0; i < children.size(); i++) {
+            // 隐藏GraphBody节点层级
+            boolean isLast = i == children.size() - 1;
+            if (children.get(i).name.equals("GraphBody")) {
+                children.get(i).print(indent, isLast);
+            } else {
+                children.get(i).print(indent + (last ? "    " : "|   "), isLast);
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+SemanticAnalyzer.class如下：
+package cxcx;
+
+import java.util.*;
+
+public class SemanticAnalyzer {
+    // 错误收集结构
+    private List<SemanticError> errors = new ArrayList<>();
+    // 语义检查数据结构
+    private final Map<String, String> tensorRegistry = new HashMap<>();
+    private final Map<String, String> nodeRegistry = new HashMap<>();
+    private final Set<String> definedTensors = new HashSet<>();
+    private final Set<String> outputTensors = new HashSet<>();
+
+    // 类型兼容性规则表
+    private static final Map<String, List<String>> OP_TYPE_RULES = new HashMap<>();
+    static {
+        OP_TYPE_RULES.put("Add", List.of("FLOAT", "INT"));
+        OP_TYPE_RULES.put("Sub", List.of("FLOAT", "INT"));
+        OP_TYPE_RULES.put("Conv", List.of("FLOAT"));
+        OP_TYPE_RULES.put("MatMul", List.of("FLOAT"));
+    }
+
+    public void analyze(ASTNode modelAST) {
+        errors.clear();
+        traverseAST(modelAST, true);  // 定义收集阶段
+        traverseAST(modelAST, false); // 检查验证阶段
+
+        if (!errors.isEmpty()) {
+            throw new SemanticErrorException(new ArrayList<>(errors));
+        }
+    }
+
+    private void traverseAST(ASTNode node, boolean isDefinitionPhase) {
+        switch (node.getName()) {
+            case "tensor":
+                handleTensor(node, isDefinitionPhase);
+                break;
+            case "node":
+                handleNode(node, isDefinitionPhase);
+                break;
+            case "input_list":
+            case "output_list":
+                handleIOPorts(node, isDefinitionPhase);
+                break;
+            default:
+                node.getChildren().forEach(child -> traverseAST(child, isDefinitionPhase));
+        }
+    }
+
+    private void handleTensor(ASTNode tensorNode, boolean isDefinitionPhase) {
+        try {
+            String name = getChildValue(tensorNode, "name");
+            String dataType = getChildValue(tensorNode, "data_type").toUpperCase();
+
+            if (isDefinitionPhase) {
+                if (tensorRegistry.containsKey(name)) {
+                    errors.add(new SemanticError("Tensor name conflict: " + name));
+                }
+                tensorRegistry.put(name, dataType);
+                definedTensors.add(name);
+            }
+        } catch (Exception e) {
+            errors.add(new SemanticError(e.getMessage()));
+        }
+    }
+
+    private void handleNode(ASTNode node, boolean isDefinitionPhase) {
+        try {
+            String nodeName = getChildValue(node, "name");
+            String opType = getChildValue(node, "op_type").toUpperCase();
+
+            if (isDefinitionPhase) {
+                if (nodeRegistry.containsKey(nodeName)) {
+                    errors.add(new SemanticError("Node name conflict: " + nodeName));
+                }
+                nodeRegistry.put(nodeName, opType);
+            } else {
+                List<String> inputs = collectInputs(node);
+                List<String> outputs = collectOutputs(node);
+
+                checkUndefinedReferences(inputs, nodeName);
+                checkOutputUniqueness(outputs, nodeName);
+                checkTypeConsistency(inputs, outputs, opType);
+            }
+        } catch (Exception e) {
+            errors.add(new SemanticError(e.getMessage()));
+        }
+    }
+
+    private void handleIOPorts(ASTNode ioList, boolean isDefinitionPhase) {
+        try {
+            ioList.getChildren().stream()
+                    .filter(n -> "value_info".equals(n.getName()))
+                    .forEach(valueInfo -> {
+                        String tensorName = getChildValue(valueInfo, "name");
+                        String dataType = getTensorType(valueInfo);
+
+                        if (isDefinitionPhase) {
+                            // 检查张量名称冲突
+                            if (tensorRegistry.containsKey(tensorName)) {
+                                errors.add(new SemanticError("Tensor name conflict: " + tensorName));
+                            }
+                            tensorRegistry.put(tensorName, dataType);
+                            definedTensors.add(tensorName);
+                        }
+                    });
+        } catch (Exception e) {
+            errors.add(new SemanticError("Error processing IO ports: " + e.getMessage()));
+        }
+    }
+    private String getTensorType(ASTNode valueInfo) {
+        return valueInfo.getChildren().stream()
+                .filter(n -> "tensor_type".equals(n.getName()))
+                .flatMap(n -> n.getChildren().stream())
+                .filter(n -> "elem_type".equals(n.getName()))
+                .findFirst()
+                .map(ASTNode::getValue)
+                .orElseThrow(() -> new RuntimeException("Missing elem_type in tensor_type"))
+                .toUpperCase();
+    }
+
+    // 其他方法保持相同结构，替换异常抛出为错误收集
+    private void checkUndefinedReferences(List<String> inputs, String nodeName) {
+        inputs.forEach(input -> {
+            if (!definedTensors.contains(input)) {
+                errors.add(new SemanticError("Undefined tensor reference: " + input + " in node " + nodeName));
+            }
+        });
+    }
+
+    private void checkOutputUniqueness(List<String> outputs, String nodeName) {
+        outputs.forEach(output -> {
+            if (outputTensors.contains(output)) {
+                errors.add(new SemanticError("Output tensor conflict: " + output + " in node " + nodeName));
+            }
+            outputTensors.add(output);
+        });
+    }
+
+    private void checkTypeConsistency(List<String> inputs, List<String> outputs, String opType) {
+        if (inputs.isEmpty()) return;
+
+        String firstType = tensorRegistry.get(inputs.get(0));
+        boolean allMatch = inputs.stream()
+                .skip(1)
+                .map(tensorRegistry::get)
+                .allMatch(t -> t.equals(firstType));
+
+        if (!allMatch) {
+            errors.add(new SemanticError("Input type mismatch for " + opType + " operation"));
+        }
+
+        List<String> allowedTypes = OP_TYPE_RULES.getOrDefault(opType, Collections.emptyList());
+        if (!allowedTypes.isEmpty() && !allowedTypes.contains(firstType)) {
+            errors.add(new SemanticError("Invalid input type " + firstType + " for " + opType));
+        }
+
+        outputs.forEach(output -> {
+            String outputType = tensorRegistry.get(output);
+            if (opType.equals("Conv") && !"FLOAT".equals(outputType)) {
+                errors.add(new SemanticError("Conv output must be FLOAT"));
+            }
+        });
+    }
+
+    // 辅助方法保持不变
+    private String getChildValue(ASTNode parent, String childName) {
+        return parent.getChildren().stream()
+                .filter(n -> childName.equals(n.getName()))
+                .findFirst()
+                .map(ASTNode::getValue)
+                .orElseThrow(() -> new RuntimeException("Missing " + childName));
+    }
+
+    private List<String> collectInputs(ASTNode node) {
+        return node.getChildren().stream()
+                .filter(n -> n.getName().endsWith("_list") || n.getName().endsWith("_arr"))
+                .flatMap(n -> n.getChildren().stream())
+                .filter(n -> "Value".equals(n.getName()))
+                .map(ASTNode::getValue)
+                .toList();
+    }
+
+    private List<String> collectOutputs(ASTNode node) {
+        return node.getChildren().stream()
+                .filter(n -> "output_list".equals(n.getName()) || "output_arr".equals(n.getName()))
+                .flatMap(n -> n.getChildren().stream())
+                .filter(n -> "Value".equals(n.getName()))
+                .map(ASTNode::getValue)
+                .toList();
+    }
+
+    public static class SemanticError {
+        private final String message;
+        public SemanticError(String message) { this.message = message; }
+        public String getMessage() { return message; }
+    }
+
+    public static class SemanticErrorException extends RuntimeException {
+        private final List<SemanticError> errors;
+        public SemanticErrorException(List<SemanticError> errors) { this.errors = errors; }
+        public List<SemanticError> getErrors() { return errors; }
+    }
+}
+
+
+
+
+
+
+
+CodeGenerator.class如下：
+
+package cxcx;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+public class CodeGenerator {
+    private List<String> tacCode = new ArrayList<>();
+    private int tempCounter = 0;
+    private int labelCounter = 0;
+
+    public List<String> generate(ASTNode ast) {
+        visitNode(ast);
+        return tacCode;
+    }
+
+    private void visitNode(ASTNode node) {
+        switch (node.getName()) {
+            case "ModelBody":
+                processModel(node);
+                break;
+            case "graph":
+                processGraph(node);
+                break;
+            case "node":
+                processNode(node);
+                break;
+            case "tensor":
+                processTensor(node);
+                break;
+            case "opset_import":
+                processOpsetImport(node);
+                break;
+            case "initializer_list":
+                processInitializerList(node);
+                break;
+            default:
+                processChildren(node);
+                break;
+        }
+    }
+
+    private void processModel(ASTNode modelNode) {
+        tacCode.add("; MODEL DEFINITION");
+        processChildren(modelNode);
+    }
+
+    private void processGraph(ASTNode graphNode) {
+        String graphName = getGraphName(graphNode);
+        tacCode.add(String.format("; GRAPH: %s", graphName));
+
+        for (ASTNode child : graphNode.getChildren()) {
+            if ("graph_body".equals(child.getName())) {
+                processGraphBody(child);
+            }
+        }
+        //processChildren(graphNode);
+    }
+    private void processGraphBody(ASTNode graphBody) {
+        for (ASTNode child : graphBody.getChildren()) {
+            switch (child.getName()) {
+                case "input_list":
+                    processInputs(child);
+                    break;
+                case "output_list":
+                    processOutputs(child);
+                    break;
+                case "node_list":
+                    processNodeList(child); // 新增处理node_list
+                    break;
+                case "initializer_list":
+                    processInitializerList(child); // 处理initializer_list
+                    break;
+                // 其他已有处理...
+            }
+        }
+    }
+    private void processInputs(ASTNode inputList) {
+        for (ASTNode input : inputList.getChildren()) {
+            if ("value_info".equals(input.getName())) {
+                String name = "";
+                String typeInfo = "";
+                for (ASTNode field : input.getChildren()) {
+                    if ("name".equals(field.getName())) {
+                        name = field.getValue().replaceAll("\"", "");
+                    } else if ("tensor_type".equals(field.getName())) {
+                        typeInfo = parseTensorType(field);
+                    }
+                }
+                tacCode.add(String.format("; INPUT %s: %s", name, typeInfo));
+            }
+        }
+    }
+
+    private void processOutputs(ASTNode outputList) {
+        for (ASTNode output : outputList.getChildren()) {
+            if ("value_info".equals(output.getName())) {
+                String name = "";
+                String typeInfo = "";
+                for (ASTNode field : output.getChildren()) {
+                    if ("name".equals(field.getName())) {
+                        name = field.getValue().replaceAll("\"", "");
+                    } else if ("tensor_type".equals(field.getName())) {
+                        typeInfo = parseTensorType(field);
+                    }
+                }
+                tacCode.add(String.format("; OUTPUT %s: %s", name, typeInfo));
+            }
+        }
+    }
+    private String parseTensorType(ASTNode tensorType) {
+        String elemType = "UNKNOWN";
+        List<String> dims = new ArrayList<>();
+
+        // 精确遍历tensor_type子节点
+        for (ASTNode child : tensorType.getChildren()) {
+            if ("elem_type".equals(child.getName())) {
+                elemType = child.getValue().toUpperCase();
+            } else if ("shape".equals(child.getName())) {
+                dims = extractDims(child);
+            }
+        }
+
+        // 构建类型字符串
+        return dims.isEmpty() ?
+                elemType :
+                String.format("%s[%s]", elemType, String.join(",", dims));
+    }
+
+    private String getGraphName(ASTNode graphNode) {
+        for (ASTNode child : graphNode.getChildren()) {
+            if ("graph_body".equals(child.getName())) {
+                for (ASTNode subChild : child.getChildren()) {
+                    if ("name".equals(subChild.getName())) {
+                        return subChild.getValue().replaceAll("\"", "");
+                    }
+                }
+            }
+        }
+        return "unnamed_graph";
+    }
+
+    private void processNode(ASTNode node) {
+        String opType = "";
+        String nodeName = "";
+        List<String> inputs = new ArrayList<>();
+        List<String> outputs = new ArrayList<>();
+        List<String> attributes = new ArrayList<>();
+
+        for (ASTNode child : node.getChildren()) {
+            switch (child.getName()) {
+                case "op_type":
+                    opType = child.getValue().replaceAll("\"", "");
+                    break;
+                case "name":
+                    nodeName = child.getValue();
+                    break;
+                case "input_list":
+                case "input_arr":
+                    inputs.addAll(extractValues(child));
+                    break;
+                case "output_list":
+                case "output_arr":
+                    outputs.addAll(extractValues(child));
+                    break;
+                case "attribute_list":
+                    attributes.addAll(extractAttributes(child));
+                    break;
+            }
+        }
+
+        if (!opType.isEmpty()) {
+            String operation = buildOperation(opType, nodeName, inputs, outputs, attributes);
+            tacCode.add(operation);
+        }
+        processChildren(node);
+    }
+
+    private List<String> extractValues(ASTNode container) {
+        List<String> values = new ArrayList<>();
+        for (ASTNode child : container.getChildren()) {
+            if ("Value".equals(child.getName())) {
+                values.add(child.getValue());
+            }
+        }
+        return values;
+    }
+
+    private List<String> extractAttributes(ASTNode attributeList) {
+        List<String> attrs = new ArrayList<>();
+        for (ASTNode attr : attributeList.getChildren()) {
+            if ("attribute".equals(attr.getName())) {
+                String name = "";
+                String value = "";
+                for (ASTNode attrChild : attr.getChildren()) {
+                    if ("name".equals(attrChild.getName())) {
+                        name = attrChild.getValue();
+                    } else if ("Value".equals(attrChild.getName())) {
+                        value = attrChild.getValue();
+                    }
+                }
+                if (!name.isEmpty() && !value.isEmpty()) {
+                    attrs.add(String.format("%s=%s", name, value));
+                }
+            }
+        }
+        return attrs;
+    }
+
+    private String buildOperation(String opType, String nodeName,
+                                  List<String> inputs, List<String> outputs,
+                                  List<String> attributes) {
+        String result = !outputs.isEmpty() ? outputs.get(0) : newTemp();
+        String params = String.join(", ", inputs);
+        String attrs = attributes.isEmpty() ? "" : ", " + String.join(", ", attributes);
+
+        return String.format("%s = %s(%s%s) ; %s",
+                result, opType.toUpperCase(), params, attrs, nodeName);
+    }
+
+    private void processTensor(ASTNode tensorNode) {
+        String tensorName = "";
+        String dataType = "";
+        List<String> dims = new ArrayList<>();
+        String rawData = "";
+
+        for (ASTNode child : tensorNode.getChildren()) {
+            switch (child.getName()) {
+                case "name":
+                    tensorName = child.getValue().replaceAll("\"", "");
+                    break;
+                case "data_type":
+                    dataType = child.getValue();
+                    break;
+                case "dims":
+                    dims = extractDims(child);
+                    break;
+                case "raw_data":
+                    rawData = child.getValue();
+                    break;
+            }
+        }
+
+        if (!tensorName.isEmpty()) {
+            String dimStr = String.join("][", dims);
+            tacCode.add(String.format("INIT %s: %s[%s] = %s",
+                    tensorName, dataType, dimStr, rawData));
+        }
+    }
+
+    private List<String> extractDims(ASTNode shapeNode) {
+        List<String> dims = new ArrayList<>();
+
+        // 遍历所有子节点，手动筛选 dim_list
+        for (ASTNode child : shapeNode.getChildren()) {
+            if ("dim_list".equals(child.getName())) {
+
+                // 遍历 dim_list 的子节点，筛选 dim
+                for (ASTNode dim : child.getChildren()) {
+                    if ("dim".equals(dim.getName())) {
+
+                        // 解析 dim_value,dim_param
+                        for (ASTNode valueNode : dim.getChildren()) {
+                            if ("dim_value".equals(valueNode.getName())) {
+                                dims.add(valueNode.getValue());
+                            }
+                            if ("dim_param".equals(valueNode.getName())){
+                                dims.add(valueNode.getValue());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return dims;
+    }
+
+    private Optional<String> parseDimValue(ASTNode dimNode) {
+        for (ASTNode dimChild : dimNode.getChildren()) {
+            if ("dim_value".equals(dimChild.getName())) {
+                return Optional.of(dimChild.getValue().replaceAll("\"", ""));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private void processOpsetImport(ASTNode opsetNode) {
+        String domain = "";
+        String version = "";
+
+        for (ASTNode child : opsetNode.getChildren()) {
+            if ("domain".equals(child.getName())) {
+                domain = child.getValue();
+            } else if ("version".equals(child.getName())) {
+                version = child.getValue();
+            }
+        }
+
+        tacCode.add(String.format("OPSET %s VERSION %s", domain, version));
+    }
+
+    private void processNodeList(ASTNode nodeList) {
+        for (ASTNode node : nodeList.getChildren()) {
+            if ("node".equals(node.getName())) {
+                processNode(node);
+            }
+        }
+    }
+
+    private void processInitializerList(ASTNode initializerList) {
+        for (ASTNode child : initializerList.getChildren()) {
+            if ("tensor".equals(child.getName())) {
+                processTensor(child);
+            }
+        }
+    }
+
+    private void processChildren(ASTNode node) {
+        for (ASTNode child : node.getChildren()) {
+            visitNode(child);
+        }
+    }
+
+    private String newTemp() {
+        return "t" + tempCounter++;
+    }
+
+    private String newLabel() {
+        return "L" + labelCounter++;
+    }
+}

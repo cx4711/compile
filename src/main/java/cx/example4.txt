@@ -1,0 +1,71 @@
+ModelProto{
+    ir_version = 1
+    producer_name = "TestProducer"
+    producer_version = "1.0"
+    domain = "test.onnx"
+model_version = 1
+doc_string = "This is testmodel4."
+    graph{
+        name = "ComplexShapeGraph"
+        node{
+            op_type = "Conv"
+            name = "ConvNode"
+            input = ["input1", "initializer1"]
+            output = ["output1"]
+        }
+        input{
+            name = "input1"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                        dim{
+                            dim_value = 3
+                        }
+                        dim{
+                            dim_value = 224
+                        }
+                        dim{
+                            dim_value = 224
+                        }
+                    }
+                }
+            }
+        }
+        initializer{
+            name = "initializer1"
+            data_type = float
+            dims = 64 3 3 3
+            raw_data = 0102b
+        }
+        output{
+            name = "output1"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                        dim{
+                            dim_value = 64
+                        }
+                        dim{
+                            dim_value = 222
+                        }
+                        dim{
+                            dim_value = 222
+                        }
+                    }
+                }
+            }
+        }
+    }
+    opset_import{
+        domain = "ai.onnx"
+        version = 11
+    }
+}

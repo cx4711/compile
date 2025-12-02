@@ -1,0 +1,59 @@
+ModelProto{
+    ir_version = 1
+    producer_name = "TestProducer"
+    producer_version = "1.0"
+    domain = "test.onnx"
+model_version = 1
+doc_string = "This is testmodel2."
+    graph{
+        name = "GraphWithInitializer"
+        node{
+            op_type = "MatMul"
+            name = "MatMulNode"
+            input = ["input1", "initializer1"]
+            output = ["output1"]
+        }
+        input{
+            name = "input1"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                        dim{
+                            dim_value = 2
+                        }
+                    }
+                }
+            }
+        }
+        output{
+            name = "output1"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+        }
+initializer{
+            name = "initializer1"
+            data_type = float
+            dims = 2 1
+            raw_data = 01020304b
+        }
+    }
+    opset_import{
+        domain = "ai.onnx"
+        version = 11
+    }
+}

@@ -1,0 +1,21 @@
+ModelProto{
+    ir_version = 1
+    producer_name = "TestProducer"
+    producer_version = "1.0"
+    domain = "test.onnx"
+model_version = 1
+doc_string = "This is testmodel10."
+    graph{
+        name = "SyntaxErrorGraph"
+        node{
+            op_type = "Add"
+            name = "AddNode"
+            input = ["input1", "input2"]
+            output = ["output1"]
+        }
+    }
+    opset_import{
+        domain = "ai.onnx"
+        version = 11
+    }
+}

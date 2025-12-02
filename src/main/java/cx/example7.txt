@@ -1,0 +1,56 @@
+ModelProto{
+    ir_version = 1
+    producer_name = "Test"
+    graph{
+        node{
+            op_type = "Add"
+            name = "Node1"
+            input = ["input1", "input2"]
+            output = ["output1"]
+        }
+        input{
+            name = "input1"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+        }
+        input{
+            name = "input2"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+        }
+        output{
+            name = "output1"
+            type{
+                tensor_type{
+                    elem_type = float
+                    shape{
+                        dim{
+                            dim_value = 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+    opset_import{
+        domain = "ai.onnx"
+        version = 11
+    }
+    keyword = "value"
+}
