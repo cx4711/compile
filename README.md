@@ -4,3 +4,4 @@
 2）根据S-ONNX的语法规则，对词法分析得到的词法单元序列进行分析，判断其是否符合S-ONNX的语法结构，并生成抽象语法树；
 3）根据S-ONNX的语义要求，对S-ONNX模型进行语义检查；
 4）在完成上述分析的基础上，将S-ONNX模型转换为三地址码表示的中间代码。
+本实验项目将对ONNX模型进行裁剪，形成S-ONNX（Simplified Open Neural Network Exchange），保留了ONNX模型的核心结构和语义。
