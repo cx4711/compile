@@ -135,11 +135,3 @@ java -jar S-ONNXCompiler.jar <input_file>
 ## 许可证
 本项目采用 MIT 许可证 - 查看 LICENSE 文件了解详情。
 
-
-<<<<<<< HEAD
-=======
-
-
-
-
->>>>>>> 3475e28078390fac44dfa94a96ec012f8f6b04be
