@@ -138,7 +138,6 @@ public class LexicalAnalyzer {
         } else if (match.matches(SYMBOLS)) {
             return TokenType.SYMBOL;
         }
-        // 如果都不匹配，返回错误类型
-        return TokenType.ERROR;
+        return TokenType.ERROR;// 如果都不匹配，返回错误类型
     }
 }
