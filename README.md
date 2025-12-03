@@ -96,11 +96,7 @@ IDE：推荐使用 IntelliJ IDEA 2023.2+
 ### 构建与运行
 使用 IntelliJ IDEA 克隆项目到本地，
 
-<<<<<<< HEAD
-```
-=======
 ```bash
->>>>>>> 3475e28078390fac44dfa94a96ec012f8f6b04be
 git clone https://github.com/your-username/compile.git
 ```
 
@@ -113,11 +109,7 @@ git clone https://github.com/your-username/compile.git
 ## 使用说明
 编译器支持命令行参数指定输入文件：
 
-<<<<<<< HEAD
-```
-=======
 ```bash
->>>>>>> 3475e28078390fac44dfa94a96ec012f8f6b04be
 java -jar S-ONNXCompiler.jar <input_file>
 ```
 
@@ -134,4 +126,7 @@ java -jar S-ONNXCompiler.jar <input_file>
 
 ## 许可证
 本项目采用 MIT 许可证 - 查看 LICENSE 文件了解详情。
+
+
+
 
